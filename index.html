@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CBT Sosiologi - Standar CAT</title>
+  <style>
+    :root { --primary: #1d4ed8; --bg: #f3f4f6; --text: #1f2937; --success: #16a34a; --warning: #d97706; --danger: #dc2626; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 0; }
+    
+    /* Layout Utama */
+    .container { max-width: 1200px; margin: 0 auto; padding: 15px; }
+    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    
+    /* Halaman Login */
+    .login-wrapper { max-width: 500px; margin: 50px auto; }
+    h2 { text-align: center; color: var(--primary); }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-weight: bold; margin-bottom: 5px; }
+    select, input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
+    button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+    button:disabled { background: #9ca3af; cursor: not-allowed; }
+    button:hover:not(:disabled) { background: #1e3a8a; }
+
+    /* Layout Ujian (Model CAT) */
+    #exam-page { display: none; }
+    .header-exam { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; border-left: 5px solid var(--primary); }
+    .timer { font-size: 24px; font-weight: bold; color: var(--danger); background: #fee2e2; padding: 5px 15px; border-radius: 5px; }
+    
+    .cat-layout { display: flex; gap: 20px; align-items: flex-start; }
+    
+    /* Panel Kiri (Soal) */
+    .panel-soal { flex: 3; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .teks-soal { font-size: 16px; line-height: 1.6; margin-bottom: 20px; }
+    .teks-soal img, .opsi-text img { max-width: 100%; height: auto; border-radius: 5px; margin: 10px 0; }
+    
+    .opsi-container { display: flex; flex-direction: column; gap: 12px; }
+    .opsi-label { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 5px; cursor: pointer; transition: 0.2s; }
+    .opsi-label:hover { background: #f9fafb; border-color: #9ca3af; }
+    .opsi-label input { margin-top: 5px; width: 18px; height: 18px; cursor: pointer; }
+    .opsi-text { flex: 1; line-height: 1.5; }
+
+    .navigasi-btn { display: flex; justify-content: space-between; margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 20px; }
+    .navigasi-btn button { width: 30%; }
+    .btn-submit { background: var(--success) !important; }
+    
+    /* Panel Kanan (Peta Soal) */
+    .panel-navigasi { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: sticky; top: 20px; }
+    .panel-navigasi h4 { margin-top: 0; text-align: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }
+    .peta-soal { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 15px; }
+    .box-soal { padding: 10px 0; text-align: center; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
+    .box-soal:hover { background: #e5e7eb; }
+    .box-soal.terjawab { background: var(--success); color: white; border-color: var(--success); }
+    .box-soal.aktif { border: 2px solid var(--warning); box-shadow: 0 0 8px rgba(217, 119, 6, 0.5); transform: scale(1.05); }
+
+    /* Halaman Selesai */
+    #result-page { display: none; text-align: center; margin-top: 50px; }
+    .loading { text-align: center; font-style: italic; color: #6b7280; padding: 20px; }
+
+    /* Responsif untuk HP */
+    @media (max-width: 768px) {
+      .cat-layout { flex-direction: column; }
+      .panel-soal, .panel-navigasi { width: 100%; box-sizing: border-box; flex: none; position: static; }
+      .peta-soal { grid-template-columns: repeat(7, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  
+  <!-- HALAMAN LOGIN -->
+  <div id="login-page" class="card login-wrapper">
+    <h2>Portal Ujian Sosiologi</h2>
+    <div id="loading-data" class="loading">Memuat koneksi ke server...</div>
+    <div id="login-form" style="display:none;">
+      <div class="form-group">
+        <label>Kelas</label>
+        <select id="kelas" onchange="filterNama()">
+          <option value="">-- Pilih Kelas --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nama Siswa</label>
+        <select id="nama">
+          <option value="">-- Pilih Nama --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Token Ujian</label>
+        <input type="text" id="token" placeholder="Masukkan Token" autocomplete="off">
+      </div>
+      <button id="btn-mulai" onclick="mulaiUjian()">Mulai Ujian</button>
+    </div>
+  </div>
+
+  <!-- HALAMAN UJIAN (CAT LAYOUT) -->
+  <div id="exam-page">
+    <div class="header-exam">
+      <div>
+        <div id="info-siswa" style="font-weight:bold; font-size:18px;">Nama Siswa</div>
+        <div id="info-kelas" style="color: #4b5563;">Kelas</div>
+      </div>
+      <div class="timer" id="timer-display">00:00</div>
+    </div>
+
+    <div class="cat-layout">
+      <!-- PANEL KIRI (SOAL) -->
+      <div class="panel-soal">
+        <h3 style="margin-top:0; color: var(--primary);">Soal No. <span id="nomor-soal">1</span></h3>
+        <!-- innerHTML digunakan di sini agar gambar dari sheet bisa terbaca -->
+        <div id="teks-soal" class="teks-soal">Memuat soal...</div>
+        
+        <div class="opsi-container" id="opsi-jawaban">
+          <!-- Opsi jawaban dirender di sini -->
+        </div>
+        
+        <div class="navigasi-btn">
+          <button id="btn-prev" onclick="navigasi(-1)" style="background:#6b7280;">&laquo; Prev</button>
+          <button id="btn-submit" onclick="konfirmasiSubmit()" class="btn-submit" style="display:none;">Selesai & Submit</button>
+          <button id="btn-next" onclick="navigasi(1)">Next &raquo;</button>
+        </div>
+      </div>
+
+      <!-- PANEL KANAN (NAVIGASI) -->
+      <div class="panel-navigasi">
+        <h4>Navigasi Soal</h4>
+        <div class="peta-soal" id="peta-soal"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HALAMAN HASIL / SELESAI -->
+  <div id="result-page" class="card login-wrapper">
+    <h2>Ujian Selesai!</h2>
+    <p id="pesan-selesai">Jawaban Anda sedang dikirim ke server...</p>
+  </div>
+
+</div>
+
+<script>
+  // ==========================================
+  // KONFIGURASI API GOOGLE APPS SCRIPT
+  // ==========================================
+  // Nanti, ganti URL di bawah ini dengan URL Web App Apps Script yang baru
+  const SCRIPT_URL = "URL_APPS_SCRIPT_ANDA_NANTI_DISINI"; 
+
+  let dataSiswaGlobal = [];
+  let soalUjian = [];
+  let jawabanSiswa = {}; 
+  let indeksSoal = 0;
+  
+  let durasiDetik = 0;
+  let intervalTimer;
+  let pelanggaran = 0;
+  let maksPelanggaran = 3;
+  let ujianAktif = false;
+
+  // 1. KETIKA HALAMAN DIBUKA, AMBIL DATA SISWA DARI API
+  window.onload = function() {
+    // Karena URL belum ada, kita skip fetch aslinya agar web bisa terbuka dulu di GitHub
+    if(SCRIPT_URL === "URL_APPS_SCRIPT_ANDA_NANTI_DISINI") {
+       document.getElementById('loading-data').innerText = "Menunggu URL Apps Script (API) dihubungkan...";
+       return;
+    }
+
+    fetch(SCRIPT_URL + "?action=getSiswa")
+      .then(response => response.json())
+      .then(data => {
+        dataSiswaGlobal = data;
+        let setKelas = new Set(data.map(item => item.kelas));
+        let dropdownKelas = document.getElementById('kelas');
+        
+        setKelas.forEach(kelas => {
+          let option = document.createElement('option');
+          option.value = kelas;
+          option.text = kelas;
+          dropdownKelas.add(option);
+        });
+        
+        document.getElementById('loading-data').style.display = 'none';
+        document.getElementById('login-form').style.display = 'block';
+      }).catch(err => {
+        document.getElementById('loading-data').innerText = "Gagal terhubung ke server.";
+        console.error(err);
+      });
+  };
+
+  // 2. FILTER NAMA BERDASARKAN KELAS
+  function filterNama() {
+    let kelasTerpilih = document.getElementById('kelas').value;
+    let dropdownNama = document.getElementById('nama');
+    dropdownNama.innerHTML = '<option value="">-- Pilih Nama --</option>'; 
+    
+    let siswaFiltered = dataSiswaGlobal.filter(item => item.kelas === kelasTerpilih);
+    siswaFiltered.forEach(siswa => {
+      let option = document.createElement('option');
+      option.value = siswa.nama;
+      option.text = siswa.nama;
+      dropdownNama.add(option);
+    });
+  }
+
+  // 3. KLIK MULAI UJIAN (FETCH KE API)
+  function mulaiUjian() {
+    let kelas = document.getElementById('kelas').value;
+    let nama = document.getElementById('nama').value;
+    let token = document.getElementById('token').value;
+
+    if(!kelas || !nama || !token) {
+      alert("Harap isi Kelas, Nama, dan Token dengan lengkap!");
+      return;
+    }
+
+    document.getElementById('btn-mulai').innerText = "Memverifikasi...";
+    document.getElementById('btn-mulai').disabled = true;
+
+    // Mengirim Token ke backend
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: "mulai", token: token })
+    })
+    .then(response => response.json())
+    .then(response => {
+      if(response.error) {
+        alert(response.error);
+        document.getElementById('btn-mulai').innerText = "Mulai Ujian";
+        document.getElementById('btn-mulai').disabled = false;
+      } else {
+        // Berhasil masuk
+        soalUjian = response.soal;
+        durasiDetik = response.durasi * 60;
+        maksPelanggaran = response.maksPelanggaran;
+        
+        document.getElementById('info-siswa').innerText = nama;
+        document.getElementById('info-kelas').innerText = kelas;
+        
+        document.getElementById('login-page').style.display = 'none';
+        document.getElementById('exam-page').style.display = 'block';
+        
+        ujianAktif = true;
+        buatPetaSoal();
+        tampilSoal(0);
+        mulaiTimer();
+        pasangDeteksiKecurangan();
+      }
+    })
+    .catch(err => {
+      alert("Terjadi kesalahan jaringan.");
+      document.getElementById('btn-mulai').innerText = "Mulai Ujian";
+      document.getElementById('btn-mulai').disabled = false;
+    });
+  }
+
+  // 4. RENDER SOAL DAN OPSI (MENDUKUNG GAMBAR / HTML)
+  function tampilSoal(index) {
+    indeksSoal = index;
+    let soal = soalUjian[index];
+    
+    document.getElementById('nomor-soal').innerText = index + 1;
+    // PENTING: innerHTML agar tag <img> dari sheet terbaca menjadi gambar
+    document.getElementById('teks-soal').innerHTML = soal.pertanyaan;
+    
+    let opsiHTML = '';
+    const pilihan = ['A', 'B', 'C', 'D', 'E'];
+    const dataOpsi = [soal.opsiA, soal.opsiB, soal.opsiC, soal.opsiD, soal.opsiE];
+    
+    for(let i=0; i<5; i++) {
+      let isChecked = (jawabanSiswa[soal.id] === pilihan[i]) ? 'checked' : '';
+      // innerHTML di opsi agar opsi berupa gambar juga bisa muncul
+      opsiHTML += `
+        <label class="opsi-label">
+          <input type="radio" name="opsi" value="${pilihan[i]}" onchange="simpanJawaban('${soal.id}', '${pilihan[i]}')" ${isChecked}>
+          <div class="opsi-text"><b>${pilihan[i]}.</b> ${dataOpsi[i]}</div>
+        </label>
+      `;
+    }
+    document.getElementById('opsi-jawaban').innerHTML = opsiHTML;
+    
+    document.getElementById('btn-prev').style.visibility = (index === 0) ? 'hidden' : 'visible';
+    
+    if (index === soalUjian.length - 1) {
+      document.getElementById('btn-next').style.display = 'none';
+      document.getElementById('btn-submit').style.display = 'block';
+    } else {
+      document.getElementById('btn-next').style.display = 'block';
+      document.getElementById('btn-submit').style.display = 'none';
+    }
+
+    updateWarnaPeta();
+  }
+
+  function navigasi(arah) {
+    let indexBaru = indeksSoal + arah;
+    if(indexBaru >= 0 && indexBaru < soalUjian.length) {
+      tampilSoal(indexBaru);
+    }
+  }
+
+  function simpanJawaban(idSoal, jawaban) {
+    jawabanSiswa[idSoal] = jawaban;
+    updateWarnaPeta();
+  }
+
+  // 5. PETA SOAL (KOTAK NOMOR NAVIGASI KANAN)
+  function buatPetaSoal() {
+    let html = '';
+    for(let i=0; i<soalUjian.length; i++) {
+      html += `<div class="box-soal" id="box-${i}" onclick="tampilSoal(${i})">${i+1}</div>`;
+    }
+    document.getElementById('peta-soal').innerHTML = html;
+  }
+
+  function updateWarnaPeta() {
+    for(let i=0; i<soalUjian.length; i++) {
+      let box = document.getElementById(`box-${i}`);
+      let idSoal = soalUjian[i].id;
+      
+      box.classList.remove('aktif', 'terjawab');
+      
+      if(jawabanSiswa[idSoal]) {
+        box.classList.add('terjawab');
+      }
+      if(i === indeksSoal) {
+        box.classList.add('aktif');
+      }
+    }
+  }
+
+  // 6. TIMER UJIAN
+  function mulaiTimer() {
+    intervalTimer = setInterval(function() {
+      if (durasiDetik <= 0) {
+        clearInterval(intervalTimer);
+        alert("Waktu Habis! Jawaban Anda akan otomatis dikirim.");
+        prosesSubmit();
+        return;
+      }
+      
+      durasiDetik--;
+      let menit = Math.floor(durasiDetik / 60);
+      let detik = durasiDetik % 60;
+      
+      document.getElementById('timer-display').innerText = 
+        `${menit < 10 ? '0'+menit : menit}:${detik < 10 ? '0'+detik : detik}`;
+    }, 1000);
+  }
+
+  // 7. DETEKSI PELANGGARAN
+  function pasangDeteksiKecurangan() {
+    document.addEventListener("visibilitychange", function() {
+      if (ujianAktif && document.visibilityState === 'hidden') {
+        pelanggaran++;
+        let sisaToleransi = maksPelanggaran - pelanggaran;
+        
+        if (sisaToleransi > 0) {
+          alert(`PERINGATAN! Anda terdeteksi keluar tab/browser. \nPelanggaran ke-${pelanggaran}. \nBatas: ${maksPelanggaran} kali.`);
+        } else {
+          alert("TOLERANSI HABIS! Ujian dihentikan paksa.");
+          prosesSubmit();
+        }
+      }
+    });
+  }
+
+  // 8. SUBMIT JAWABAN (FETCH POST KE API)
+  function konfirmasiSubmit() {
+    let jumlahDijawab = Object.keys(jawabanSiswa).length;
+    let konfirmasi = confirm(`Terjawab: ${jumlahDijawab} dari ${soalUjian.length} soal.\nYakin selesai sekarang?`);
+    if(konfirmasi) {
+      prosesSubmit();
+    }
+  }
+
+  function prosesSubmit() {
+    ujianAktif = false;
+    clearInterval(intervalTimer);
+    
+    document.getElementById('exam-page').style.display = 'none';
+    document.getElementById('result-page').style.display = 'block';
+    
+    let formatJawaban = [];
+    for (let id in jawabanSiswa) {
+      formatJawaban.push({ id: id, jawaban: jawabanSiswa[id] });
+    }
+
+    let payload = {
+      action: "submit",
+      kelas: document.getElementById('info-kelas').innerText,
+      nama: document.getElementById('info-siswa').innerText,
+      sisaWaktu: document.getElementById('timer-display').innerText,
+      jumlahPelanggaran: pelanggaran,
+      jawabanSiswa: formatJawaban
+    };
+
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(response => {
+      if(response.success) {
+        document.getElementById('pesan-selesai').innerHTML = `
+          <h3 style="color: var(--success);">Berhasil!</h3>
+          <p>Terima kasih, jawaban Anda telah tersimpan ke server.</p>
+        `;
+      } else {
+        document.getElementById('pesan-selesai').innerHTML = `
+          <h3 style="color: var(--danger);">Gagal Menyimpan</h3>
+          <p>${response.error}</p>
+        `;
+      }
+    })
+    .catch(err => {
+      document.getElementById('pesan-selesai').innerHTML = `
+        <h3 style="color: var(--danger);">Error Jaringan</h3>
+        <p>Gagal menghubungi server. Laporkan ke guru/pengawas.</p>
+      `;
+    });
+  }
+</script>
+
+</body>
+</html>
