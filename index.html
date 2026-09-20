@@ -142,8 +142,7 @@
   // ==========================================
   // KONFIGURASI API GOOGLE APPS SCRIPT
   // ==========================================
-  // Nanti, ganti URL di bawah ini dengan URL Web App Apps Script yang baru
-  const SCRIPT_URL = "URL_APPS_SCRIPT_ANDA_NANTI_DISINI"; 
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwcUErnGhEGFWfURkhc5ArYTs1UB4qpqncQrmvBU4QVEXEnfaacf5xWQ3vybJj6JqC5/exec"; 
 
   let dataSiswaGlobal = [];
   let soalUjian = [];
@@ -158,12 +157,6 @@
 
   // 1. KETIKA HALAMAN DIBUKA, AMBIL DATA SISWA DARI API
   window.onload = function() {
-    // Karena URL belum ada, kita skip fetch aslinya agar web bisa terbuka dulu di GitHub
-    if(SCRIPT_URL === "URL_APPS_SCRIPT_ANDA_NANTI_DISINI") {
-       document.getElementById('loading-data').innerText = "Menunggu URL Apps Script (API) dihubungkan...";
-       return;
-    }
-
     fetch(SCRIPT_URL + "?action=getSiswa")
       .then(response => response.json())
       .then(data => {
@@ -181,7 +174,7 @@
         document.getElementById('loading-data').style.display = 'none';
         document.getElementById('login-form').style.display = 'block';
       }).catch(err => {
-        document.getElementById('loading-data').innerText = "Gagal terhubung ke server.";
+        document.getElementById('loading-data').innerText = "Gagal terhubung ke server database.";
         console.error(err);
       });
   };
@@ -215,7 +208,6 @@
     document.getElementById('btn-mulai').innerText = "Memverifikasi...";
     document.getElementById('btn-mulai').disabled = true;
 
-    // Mengirim Token ke backend
     fetch(SCRIPT_URL, {
       method: 'POST',
       body: JSON.stringify({ action: "mulai", token: token })
@@ -227,7 +219,6 @@
         document.getElementById('btn-mulai').innerText = "Mulai Ujian";
         document.getElementById('btn-mulai').disabled = false;
       } else {
-        // Berhasil masuk
         soalUjian = response.soal;
         durasiDetik = response.durasi * 60;
         maksPelanggaran = response.maksPelanggaran;
@@ -258,7 +249,6 @@
     let soal = soalUjian[index];
     
     document.getElementById('nomor-soal').innerText = index + 1;
-    // PENTING: innerHTML agar tag <img> dari sheet terbaca menjadi gambar
     document.getElementById('teks-soal').innerHTML = soal.pertanyaan;
     
     let opsiHTML = '';
@@ -267,7 +257,6 @@
     
     for(let i=0; i<5; i++) {
       let isChecked = (jawabanSiswa[soal.id] === pilihan[i]) ? 'checked' : '';
-      // innerHTML di opsi agar opsi berupa gambar juga bisa muncul
       opsiHTML += `
         <label class="opsi-label">
           <input type="radio" name="opsi" value="${pilihan[i]}" onchange="simpanJawaban('${soal.id}', '${pilihan[i]}')" ${isChecked}>
@@ -402,7 +391,8 @@
       if(response.success) {
         document.getElementById('pesan-selesai').innerHTML = `
           <h3 style="color: var(--success);">Berhasil!</h3>
-          <p>Terima kasih, jawaban Anda telah tersimpan ke server.</p>
+          <p>Terima kasih, jawaban Anda telah tersimpan dengan aman di server.</p>
+          <p>Silakan tutup jendela ini.</p>
         `;
       } else {
         document.getElementById('pesan-selesai').innerHTML = `
@@ -414,7 +404,7 @@
     .catch(err => {
       document.getElementById('pesan-selesai').innerHTML = `
         <h3 style="color: var(--danger);">Error Jaringan</h3>
-        <p>Gagal menghubungi server. Laporkan ke guru/pengawas.</p>
+        <p>Gagal menghubungi server. Harap panggil pengawas.</p>
       `;
     });
   }
