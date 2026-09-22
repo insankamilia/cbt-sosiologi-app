@@ -108,7 +108,6 @@
       <!-- PANEL KIRI (SOAL) -->
       <div class="panel-soal">
         <h3 style="margin-top:0; color: var(--primary);">Soal No. <span id="nomor-soal">1</span></h3>
-        <!-- innerHTML digunakan di sini agar gambar dari sheet bisa terbaca -->
         <div id="teks-soal" class="teks-soal">Memuat soal...</div>
         
         <div class="opsi-container" id="opsi-jawaban">
@@ -230,6 +229,14 @@
         document.getElementById('exam-page').style.display = 'block';
         
         ujianAktif = true;
+        
+        // --- TAMBAHAN: PAKSA MODE FULLSCREEN ---
+        try {
+            document.documentElement.requestFullscreen();
+        } catch(e) {
+            console.log("Browser menolak fullscreen otomatis.");
+        }
+        
         buatPetaSoal();
         tampilSoal(0);
         mulaiTimer();
@@ -335,19 +342,78 @@
     }, 1000);
   }
 
-  // 7. DETEKSI PELANGGARAN
+  // ==========================================
+  // 7. FUNGSI LOG & DETEKSI KECURANGAN REAL-TIME
+  // ==========================================
+  function laporPelanggaranKeServer(jenis) {
+    let nama = document.getElementById('info-siswa').innerText;
+    let kelas = document.getElementById('info-kelas').innerText;
+    
+    let payloadLog = {
+      action: 'logPelanggaran',
+      nama: nama,
+      kelas: kelas,
+      jenis_pelanggaran: jenis
+    };
+
+    // Kirim diam-diam ke server tanpa mengganggu aktivitas siswa
+    fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payloadLog)
+    }).catch(e => console.error("Gagal mengirim log:", e));
+  }
+
   function pasangDeteksiKecurangan() {
+    // Helper function untuk memproses tiap pelanggaran
+    const prosesPelanggaran = (jenis) => {
+      if (!ujianAktif) return; // Abaikan jika ujian sudah selesai atau belum mulai
+      
+      pelanggaran++;
+      laporPelanggaranKeServer(jenis); // Lapor ke Google Sheet real-time
+      
+      let sisaToleransi = maksPelanggaran - pelanggaran;
+      
+      if (sisaToleransi > 0) {
+        alert(`PERINGATAN!\nSistem mendeteksi aktivitas mencurigakan: ${jenis}\n\nPelanggaran ke-${pelanggaran}. Batas maksimal: ${maksPelanggaran} kali.\nAktivitas ini telah dilaporkan otomatis ke server.`);
+      } else {
+        alert(`TOLERANSI HABIS!\nSistem mendeteksi terlalu banyak pelanggaran. Ujian Anda dihentikan paksa dan disubmit.`);
+        prosesSubmit();
+      }
+    };
+
+    // Sensor 1: Deteksi Pindah Tab / Minimize
     document.addEventListener("visibilitychange", function() {
-      if (ujianAktif && document.visibilityState === 'hidden') {
-        pelanggaran++;
-        let sisaToleransi = maksPelanggaran - pelanggaran;
-        
-        if (sisaToleransi > 0) {
-          alert(`PERINGATAN! Anda terdeteksi keluar tab/browser. \nPelanggaran ke-${pelanggaran}. \nBatas: ${maksPelanggaran} kali.`);
-        } else {
-          alert("TOLERANSI HABIS! Ujian dihentikan paksa.");
-          prosesSubmit();
-        }
+      if (document.visibilityState === 'hidden') {
+        prosesPelanggaran("Pindah Tab / Minimize Layar");
+      }
+    });
+
+    // Sensor 2: Deteksi Layar Kehilangan Fokus (Split Screen)
+    window.addEventListener('blur', () => {
+      prosesPelanggaran("Keluar dari Jendela Ujian / Split Screen");
+    });
+
+    // Sensor 3: Blokir Klik Kanan
+    document.addEventListener('contextmenu', e => {
+      if (ujianAktif) {
+        e.preventDefault();
+        prosesPelanggaran("Mencoba Klik Kanan");
+      }
+    });
+
+    // Sensor 4: Blokir Copy/Salin Teks
+    document.addEventListener('copy', e => {
+      if (ujianAktif) {
+        e.preventDefault();
+        prosesPelanggaran("Mencoba Copy/Salin Teks");
+      }
+    });
+
+    // Sensor 5: Blokir F12 / Inspect Element
+    document.addEventListener('keydown', e => {
+      if (ujianAktif && (e.key === 'F12' || (e.ctrlKey && e.shiftKey && e.key === 'I'))) {
+        e.preventDefault();
+        prosesPelanggaran("Mencoba Buka Developer Tools (F12)");
       }
     });
   }
